@@ -11,8 +11,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Compile and test
-        run: |
-          mkdir -p out
-          javac -d out src/main/java/dev/portfolio/taskflow/*.java src/test/java/dev/portfolio/taskflow/*.java
-          java -ea -cp out dev.portfolio.taskflow.TaskServiceTest
+          cache: maven
+      - name: Test and package
+        run: mvn --batch-mode --no-transfer-progress verify

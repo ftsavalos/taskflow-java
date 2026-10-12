@@ -19,9 +19,14 @@ public final class TaskService {
 
     public synchronized List<Task> list() { return List.copyOf(tasks.values()); }
 
+    public synchronized Task get(long id) {
+        Task task = tasks.get(id);
+        if (task == null) throw new NoSuchElementException("Task not found");
+        return task;
+    }
+
     public synchronized Task advance(long id) {
-        Task current = tasks.get(id);
-        if (current == null) throw new NoSuchElementException("Task not found");
+        Task current = get(id);
         Status next = switch (current.status()) {
             case TODO -> Status.IN_PROGRESS;
             case IN_PROGRESS -> Status.DONE;

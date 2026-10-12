@@ -3,9 +3,12 @@ package dev.portfolio.taskflow;
 import java.util.NoSuchElementException;
 import java.util.concurrent.*;
 
-/** Run with -ea. No test-library download required. */
+import org.junit.jupiter.api.Test;
+
+/** Domain tests independent of the Spring context. */
 public final class TaskServiceTest {
-    public static void main(String[] args) throws Exception {
+    @Test
+    void validatesWorkflowAndConcurrentCreation() throws Exception {
         TaskService service = new TaskService();
         var task = service.create("  Learn Java  ");
         assert task.title().equals("Learn Java");
@@ -19,7 +22,6 @@ public final class TaskServiceTest {
         expect(IllegalArgumentException.class, () -> service.create(" "));
         expect(IllegalArgumentException.class, () -> service.create(null));
         expect(IllegalArgumentException.class, () -> service.create("x".repeat(121)));
-        assert Application.quote("a\n\"\\").equals("\"a\\u000a\\\"\\\\\"");
         ExecutorService pool = Executors.newFixedThreadPool(4);
         try {
             var futures = new java.util.ArrayList<Future<?>>();

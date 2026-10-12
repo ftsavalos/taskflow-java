@@ -1,64 +1,74 @@
-# TaskFlow — Java 17 API demo
+# TaskFlow — Spring Boot task API
 
-A compact task workflow API built with Java 17 and the JDK HTTP server. Designed as a small, readable portfolio sample that runs without downloading dependencies.
+A compact Java 17 portfolio project using Spring Boot 3.5, Spring MVC, Jackson and Jakarta Bean Validation. It models a simple TODO → IN_PROGRESS → DONE workflow.
 
-## What it demonstrates
-
-- Immutable records and an exhaustive switch expression
-- Domain logic separated from the HTTP adapter
-- Validated input and explicit TODO → IN_PROGRESS → DONE transitions
-- Atomic mutations and stable, immutable list snapshots
-- JSON responses with 400, 404, 405 and 409 error handling
-- Domain tests including concurrent creation, plus GitHub Actions CI
+[![Java CI](https://github.com/ftsavalos/taskflow-java/actions/workflows/ci.yml/badge.svg)](https://github.com/ftsavalos/taskflow-java/actions/workflows/ci.yml)
 
 ## Run
 
-Requires JDK 17 or later. Commands work in Bash, Git Bash and compatible shells.
+Install JDK 17+ and Maven 3.6.3+, then:
 
 ```sh
-mkdir -p out
-javac -d out src/main/java/dev/portfolio/taskflow/*.java src/test/java/dev/portfolio/taskflow/*.java
-java -ea -cp out dev.portfolio.taskflow.TaskServiceTest
-java -cp out dev.portfolio.taskflow.Application
+mvn verify
+mvn spring-boot:run
 ```
 
-Pass a port as the final argument to use a different port, e.g. `Application 9090`.
+Or run the packaged executable JAR:
+
+```sh
+mvn package
+java -jar target/taskflow-java-1.0.0.jar
+```
+
+The API listens on `http://localhost:8080`. Override the port with `java -jar target/taskflow-java-1.0.0.jar --server.port=9090`.
 
 ## Try it
 
 ```sh
-curl -X POST 'http://localhost:8080/tasks?title=Learn%20Java'
-# {"id":1,"title":"Learn Java","status":"TODO"}
+curl -i -X POST http://localhost:8080/tasks \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Learn Spring Boot"}'
+# HTTP 201, Location: /tasks/1
+# {"id":1,"title":"Learn Spring Boot","status":"TODO"}
 
 curl http://localhost:8080/tasks
+curl http://localhost:8080/tasks/1
 curl -X POST http://localhost:8080/tasks/1/advance
-# {"id":1,"title":"Learn Java","status":"IN_PROGRESS"}
+# {"id":1,"title":"Learn Spring Boot","status":"IN_PROGRESS"}
 
 curl -X POST http://localhost:8080/tasks/1/advance
-# {"id":1,"title":"Learn Java","status":"DONE"}
+# {"id":1,"title":"Learn Spring Boot","status":"DONE"}
 
 curl -i -X POST http://localhost:8080/tasks/1/advance
-# HTTP 409: completed tasks cannot advance
+# HTTP 409 with a problem-detail JSON response
 ```
 
 | Method | Route | Result |
 | --- | --- | --- |
 | GET | `/tasks` | List tasks in creation order |
-| POST | `/tasks?title=...` | Create a task; title must be 1–120 characters after trimming |
-| POST | `/tasks/{id}/advance` | Advance one workflow step |
+| GET | `/tasks/{id}` | Read one task; 404 if absent |
+| POST | `/tasks` | Create from JSON `{ "title": "..." }`; 201 |
+| POST | `/tasks/{id}/advance` | Advance one step; 409 after DONE |
 
-## Design and scope
+Creation requires an `application/json` body. The title is trimmed before validation and must contain 1–120 characters. Missing, null, blank or oversized titles and malformed JSON return 400. The earlier query-parameter creation format is replaced by this JSON contract.
 
-`TaskService` owns validation, IDs and transition rules. `Application` translates HTTP requests into domain calls. A synchronized service is sufficient for this bounded demo and avoids races between read and update. The server uses four worker threads and binds to loopback.
+## Design
 
-This is an educational demo: data is lost on restart, and there is no authentication, pagination or persistent database. Creation deliberately uses a query parameter to keep the example dependency-free. A larger version would use JSON request bodies with a JSON library, persistent storage, structured logging and integration tests. The Location header identifies the new task; this minimal version only exposes collection listing, not individual-task retrieval.
+- `Application`: Spring Boot entry point and domain-service bean.
+- `TaskController`: HTTP mapping with constructor injection.
+- `CreateTaskRequest`: immutable request DTO with `@NotBlank` and `@Size`.
+- `TaskResponse`: response DTO separating the HTTP contract from the domain.
+- `TaskService`: framework-independent domain rules, immutable records, synchronized mutations and immutable list snapshots.
+- `ApiExceptionHandler`: problem-detail responses for validation, missing tasks and invalid transitions. Spring handles unsupported methods and media types.
 
-## CI
+Jackson handles JSON serialization and deserialization. Request DTOs expose only editable fields: clients cannot assign IDs or initial statuses.
 
-The workflow compiles the sources with JDK 17 and runs assertions-enabled domain tests on pushes and pull requests. Local verification was unavailable in the preparation environment because it lacked javac. Run the commands above and check CI before relying on the demo.
+## Tests and CI
 
-## Suggested extensions
+`mvn verify` runs JUnit domain tests (including concurrent creation) and Spring Boot/MockMvc HTTP integration tests covering creation, lookup, listing, transitions, validation, malformed JSON, Unicode, and HTTP error codes. GitHub Actions runs the same command and packages the executable JAR.
 
-1. Add Spring Boot and JSON request DTOs.
-2. Implement persistence with PostgreSQL and optimistic locking.
-3. Add JUnit API integration tests and OpenAPI documentation.
+## Scope
+
+Tasks are stored in memory and lost on restart. There is no authentication or pagination; the default server binds to loopback for local demonstrations. This is a small educational API, not a production service.
+
+Possible next steps: PostgreSQL persistence with optimistic locking, OpenAPI documentation, and pagination.
